@@ -1,8 +1,9 @@
 #coding=utf-8
-import os
-import re
+from os import environ, system, unlink
+from re import (split as re_split, compile as re_compile)
 import time
-import urllib, urllib2
+from urllib import quote
+from urllib2 import Request, urlopen, HTTPError
 from tempfile import NamedTemporaryFile
 from translate import Translator
 
@@ -90,13 +91,18 @@ LANG_CODES = {
         "Zulu":"zu"
         }
 
-def google_tts(text, tl='en'):
+SELECTEDTEXT= environ['POPCLIP_TEXT']
+DESTLANG = environ['POPCLIP_OPTION_DESTLANG']
+TTSLANG = environ['POPCLIP_OPTION_TTSLANG']
+GTRANSLATEIP = environ['POPCLIP_OPTION_GTRANSIP'].strip()
+
+def google_tts(text, tl='en', ip_addr=None):
     """
     this function is adapted from https://github.com/hungtruong/Google-Translate-TTS, thanks @hungtruong.
     """
 	#process text into chunks
     text = text.replace('\n','')
-    text_list = re.split('(\,|\.)', text)
+    text_list = re_split('(\,|\.)', text)
     combined_text = []
     for idx, val in enumerate(text_list):
         if idx % 2 == 0:
@@ -106,7 +112,7 @@ def google_tts(text, tl='en'):
             if len(joined_text) < 100:
                 combined_text.append(joined_text)
             else:
-                subparts = re.split('( )', joined_text)
+                subparts = re_split('( )', joined_text)
                 temp_string = ""
                 temp_array = []
                 for part in subparts:
@@ -119,35 +125,33 @@ def google_tts(text, tl='en'):
                 combined_text.extend(temp_array)
     #download chunks and write them to the output file
     f = NamedTemporaryFile(delete=False)
+    host = ip_addr if ip_addr else "translate.google.com"
+    headers = {"Host":"translate.google.com",
+      "Referer":"http://www.gstatic.com/translate/sound_player2.swf",
+      "User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.94 Safari/537.36"}
     for idx, val in enumerate(combined_text):
-        mp3url = "http://translate.google.com/translate_tts?tl=%s&q=%s&total=%s&idx=%s" % (tl, urllib.quote(val), len(combined_text), idx)
-        headers = {"Host":"translate.google.com",
-          "Referer":"http://www.gstatic.com/translate/sound_player2.swf",
-          "User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_3) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.163 Safari/535.19"}
-        req = urllib2.Request(mp3url, '', headers)
+        mp3url = "http://%s/translate_tts?tl=%s&q=%s&total=%s&idx=%s" % (host, tl, quote(val), len(combined_text), idx)
+        req = Request(mp3url, headers=headers)
         if len(val) > 0:
             try:
-                response = urllib2.urlopen(req)
+                response = urlopen(req)
                 f.write(response.read())
-                time.sleep(.5)
-            except urllib2.HTTPError as e:
-                print ('%s' % e)
+            except HTTPError as e:
+                pass
     f.close()
-    os.system('afplay {0}'.format(f.name))
-    os.unlink(f.name)
+    system('afplay {0}'.format(f.name))
+    unlink(f.name)
 
 
-selectedText= os.environ['POPCLIP_TEXT']
-destLang = os.environ['POPCLIP_OPTION_DESTLANG']
-ttsLang = os.environ['POPCLIP_OPTION_TTSLANG']
-
-from translate import Translator
-translator= Translator(to_lang=LANG_CODES[destLang])
-translation = translator.translate(selectedText)
-
-if ttsLang != 'Disabled':
-    google_tts(selectedText, LANG_CODES[ttsLang])
-
-result = translation.encode('utf-8')
-
-print result
+if __name__ == '__main__':
+    ip_addr = GTRANSLATEIP
+    ip_pattern = re_compile('^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$')
+    ip_match = ip_pattern.search(GTRANSLATEIP)
+    if not ip_match:
+        ip_addr = 'translate.google.com'
+    if TTSLANG != 'Disabled':
+        google_tts(SELECTEDTEXT, LANG_CODES[TTSLANG], ip_addr)
+    translator = Translator(to_lang=LANG_CODES[DESTLANG])
+    translation = translator.translate(SELECTEDTEXT, ip_addr)
+    result = translation.encode('utf-8')
+    print result
