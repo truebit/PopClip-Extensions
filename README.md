@@ -9,6 +9,7 @@ Translate selected text instantly using google translate.
 * instantly translate selected text without opening dictionary app or browser.
 * lovely powered by google translate and support up to 81 languages by now.
 * using google tts service to convert text to speech.
+* Add option to set Google Translate IP address instead of its domain name due to GFW in Mainland China
 
 ![screenshot](docs/screen_bettertranslate1.png)
 ![screenshot](docs/screen_bettertranslate2.png)
